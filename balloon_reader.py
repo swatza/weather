@@ -34,6 +34,9 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.pthsensor.temperature = float(remote_data[7])
         drifter.pthsensor.humidity = float(remote_data[8])
         drifter.battery.voltage = float(remote_data[10])
+        drifter.Vel.x = float(remote_data[12])
+        drifter.Vel.y = float(remote_data[11])
+        drifter.Vel.z = 0
 
     except KeyError:
         drifter.ID = str(0)
@@ -46,6 +49,9 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.pthsensor.temperature = 0
         drifter.pthsensor.humidity = 0
         drifter.battery.voltage = 0
+        drifter.Vel.x = 0
+        drifter.Vel.y = 0
+        drifter.Vel.z = 0
 
      
 def ParseData(fn,counter,myID):
@@ -62,8 +68,11 @@ def ParseData(fn,counter,myID):
     for i in range(drifnum):
         drifterStrs.append(fn.readline())
         drifter = balloon_msg.balloon.add()
-    
+        #print("This is the length of the data sample %i" % len(drifterStrs[0]))
         raw = drifterStrs[i].split()
+        #print("This is the size of the split string %i" % len(raw))
+        if len(raw) == 0:
+            return None
         
         ms_since_boot = raw[1]
         rem_id = raw[2]
@@ -80,9 +89,9 @@ def ParseData(fn,counter,myID):
     
         remote_data = raw[8].split(',')
         
-        balloon_msg.receiverLLA_Pos.x = local_data[1]
-        balloon_msg.receiverLLA_Pos.y = local_data[2]
-        balloon_msg.receiverLLA_Pos.x = local_data[3]
+        balloon_msg.receiverLLA_Pos.x = float(local_data[1])
+        balloon_msg.receiverLLA_Pos.y = float(local_data[2])
+        balloon_msg.receiverLLA_Pos.z = float(local_data[3])
     
         write_buffer(drifter,remote_data,rem_id,rssi)
     
@@ -149,9 +158,12 @@ class ReadFromSensor(threading.Thread):
          while not shutdown_event.is_set():
              counter += 1
              datastr = ParseData(self.fn,counter,self.MYID)
-             self.PyPkt.setData(datastr)
-             msg_queue.put(self.PyPkt.getPacket())
-             self.logger.info("Packet Built and added to Queue")
+             if (datastr is not None):
+                 self.PyPkt.setData(datastr)
+                 msg_queue.put(self.PyPkt.getPacket())
+                 self.logger.info("Packet Built and added to Queue")
+             else:
+                 time.sleep(0.1)
              #log message for pyPacketlogger when added
         #endof while loop
         #send log message ending loop
