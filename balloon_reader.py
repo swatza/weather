@@ -56,7 +56,7 @@ def ParseData(fn,counter,myID):
     
     #drifnum = nballoon
     #size of each data packet is ~218 bytes +/- 2 bytes
-    drifnum = fn.inWaiting()/218
+    drifnum = 1 #fn.inWaiting()/218
     balloon_msg.NumberOfBalloons = drifnum
     drifterStrs = []
     for i in range(drifnum):
@@ -130,7 +130,7 @@ class ReadFromSensor(threading.Thread):
          self.logger.info("Sensor Thread has started")
      
          #self.serialPortname = serialPort
-         self.fn = serial.Serial(port = serialPort)
+         self.fn = serial.Serial(port = serialPort,timeout=1)
          #check that this opened and throw a critical error otherwise
          self.readrate = readrate
          
