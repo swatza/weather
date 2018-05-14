@@ -48,15 +48,16 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.battery.voltage = 0
 
      
-def ParseData(fn,counter,myID,nballoon):
+def ParseData(fn,counter,myID):
     balloon_msg = PyPackets_pb2.Balloon_Sensor_Set_Msg()        
     balloon_msg.packetNum = counter
     balloon_msg.ID = myID
-    balloon_msg.NumberOfBalloons = nballoon
     balloon_msg.time = time.time()
     
     #drifnum = nballoon
-    drifnum = int(fn.inWaiting()/218)
+    #size of each data packet is ~218 bytes +/- 2 bytes
+    drifnum = fn.inWaiting()/218
+    balloon_msg.NumberOfBalloons = drifnum
     drifterStrs = []
     for i in range(drifnum):
         drifterStrs.append(fn.readline())
@@ -72,15 +73,16 @@ def ParseData(fn,counter,myID,nballoon):
         raw_data = raw[6]
         
         local_data = raw[7].split(',')
-        loc_lat = local_data[1]
-        loc_long = local_data[2]
-        loc_alt = local_data[3]
         loc_vel = local_data[4]
         loc_course = local_data[5]
         loc_date = local_data[6]
         loc_time = local_data[7]
     
         remote_data = raw[8].split(',')
+        
+        balloon_msg.receiverLLA_Pos.x = local_data[1]
+        balloon_msg.receiverLLA_Pos.y = local_data[2]
+        balloon_msg.receiverLLA_Pos.x = local_data[3]
     
         write_buffer(drifter,remote_data,rem_id,rssi)
     
@@ -146,7 +148,7 @@ class ReadFromSensor(threading.Thread):
          
          while not shutdown_event.is_set():
              counter += 1
-             datastr = ParseData(self.fn,counter,self.MYID,myIDnum)
+             datastr = ParseData(self.fn,counter,self.MYID)
              self.PyPkt.setData(datastr)
              msg_queue.put(self.PyPkt.getPacket())
              self.logger.info("Packet Built and added to Queue")
