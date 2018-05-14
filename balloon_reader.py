@@ -1,5 +1,5 @@
 '''
-Balloon Reader is a process to read in from a board sensor that communicates with several (up to 4) drifting balloons for teh summer research project
+Balloon Reader is a process to read in from a board sensor that communicates with several (up to 4) drifting balloons for the summer research project
 '''
 import time
 import sys
@@ -48,13 +48,14 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.battery.voltage = 0
 
      
-def ParseData(fn,counter,myID):
+def ParseData(fn,counter,myID,nballoon):
     balloon_msg = PyPackets_pb2.Balloon_Sensor_Set_Msg()        
     balloon_msg.packetNum = counter
     balloon_msg.ID = myID
+    balloon_msg.NumberOfBalloons = nballoon
     balloon_msg.time = time.time()
     
-    drifnum = 1
+    drifnum = nballoon
     drifterStrs = []
     for i in range(drifnum):
         drifterStrs.append(fn.readline())
@@ -144,7 +145,7 @@ class ReadFromSensor(threading.Thread):
          
          while not shutdown_event.is_set():
              counter += 1
-             datastr = ParseData(self.fn,counter,self.MYID)
+             datastr = ParseData(self.fn,counter,self.MYID,myIDnum)
              self.PyPkt.setData(datastr)
              msg_queue.put(self.PyPkt.getPacket())
              self.logger.info("Packet Built and added to Queue")
