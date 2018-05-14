@@ -55,7 +55,8 @@ def ParseData(fn,counter,myID,nballoon):
     balloon_msg.NumberOfBalloons = nballoon
     balloon_msg.time = time.time()
     
-    drifnum = nballoon
+    #drifnum = nballoon
+    drifnum = int(fn.inWaiting()/218)
     drifterStrs = []
     for i in range(drifnum):
         drifterStrs.append(fn.readline())
