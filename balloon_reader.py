@@ -22,7 +22,7 @@ shutdown_event = threading.Event()
 msg_queue = Queue.Queue()
 
 def write_buffer(drifter,remote_data,rem_id,rssi):
-    try:
+    if remote_data is not None:
         drifter.packetNum = 1
         drifter.ID = str(rem_id)
         drifter.rssi = float(rssi)
@@ -38,7 +38,8 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.Vel.y = float(remote_data[11])
         drifter.Vel.z = 0
 
-    except KeyError:
+    else:
+        drifter.packetNum = 1
         drifter.ID = str(0)
         drifter.rssi = 0
         drifter.time = 0
@@ -65,35 +66,43 @@ def ParseData(fn,counter,myID):
     drifnum = 1 #fn.inWaiting()/218
     balloon_msg.NumberOfBalloons = drifnum
     drifterStrs = []
-    for i in range(drifnum):
-        drifterStrs.append(fn.readline())
-        drifter = balloon_msg.balloon.add()
-        #print("This is the length of the data sample %i" % len(drifterStrs[0]))
-        raw = drifterStrs[i].split()
-        #print("This is the size of the split string %i" % len(raw))
-        if len(raw) == 0:
-            return None
-        
-        ms_since_boot = raw[1]
-        rem_id = raw[2]
-        rssi = raw[3]
-        rnge = raw[4]
-        azimuth = raw[5]
-        raw_data = raw[6]
-        
-        local_data = raw[7].split(',')
-        loc_vel = local_data[4]
-        loc_course = local_data[5]
-        loc_date = local_data[6]
-        loc_time = local_data[7]
-    
-        remote_data = raw[8].split(',')
-        
-        balloon_msg.receiverLLA_Pos.x = float(local_data[1])
-        balloon_msg.receiverLLA_Pos.y = float(local_data[2])
-        balloon_msg.receiverLLA_Pos.z = float(local_data[3])
-    
-        write_buffer(drifter,remote_data,rem_id,rssi)
+    if fn is not None:
+        for i in range(drifnum):
+            drifterStrs.append(fn.readline())
+            drifter = balloon_msg.balloon.add()
+            #print("This is the length of the data sample %i" % len(drifterStrs[0]))
+            raw = drifterStrs[i].split()
+            #print("This is the size of the split string %i" % len(raw))
+            if len(raw) == 0:
+                return None
+
+            ms_since_boot = raw[1]
+            rem_id = raw[2]
+            rssi = raw[3]
+            rnge = raw[4]
+            azimuth = raw[5]
+            raw_data = raw[6]
+
+            local_data = raw[7].split(',')
+            loc_vel = local_data[4]
+            loc_course = local_data[5]
+            loc_date = local_data[6]
+            loc_time = local_data[7]
+
+            remote_data = raw[8].split(',')
+
+            balloon_msg.receiverLLA_Pos.x = float(local_data[1])
+            balloon_msg.receiverLLA_Pos.y = float(local_data[2])
+            balloon_msg.receiverLLA_Pos.z = float(local_data[3])
+
+            write_buffer(drifter,remote_data,rem_id,rssi)
+    else:
+        for i in range(drifnum):
+            drifter = balloon_msg.balloon.add()
+            write_buffer(drifter,None,0,0)
+            balloon_msg.receiverLLA_Pos.x = 0.0
+            balloon_msg.receiverLLA_Pos.y = 1.0
+            balloon_msg.receiverLLA_Pos.z = 2.0
     
     return balloon_msg.SerializeToString()
         
@@ -139,7 +148,10 @@ class ReadFromSensor(threading.Thread):
          self.logger.info("Sensor Thread has started")
      
          #self.serialPortname = serialPort
-         self.fn = serial.Serial(port = serialPort,timeout=1)
+         if serialPort is None:
+             self.fn = None
+         else:
+            self.fn = serial.Serial(port = serialPort,timeout=1)
          #check that this opened and throw a critical error otherwise
          self.readrate = readrate
          
@@ -149,8 +161,7 @@ class ReadFromSensor(threading.Thread):
          self.PyPkt = PyPacket.PyPacket()
          self.PyPkt.setDataType(PyPacket.PacketDataType.PKT_BALLOON_SENSOR_SET)
          self.PyPkt.setID(thisid.getBytes())
-         
-         
+
 	
 	def run(self):
          counter = 0
@@ -158,7 +169,7 @@ class ReadFromSensor(threading.Thread):
          while not shutdown_event.is_set():
              counter += 1
              datastr = ParseData(self.fn,counter,self.MYID)
-             if (datastr is not None):
+             if datastr is not None:
                  self.PyPkt.setData(datastr)
                  msg_queue.put(self.PyPkt.getPacket())
                  self.logger.info("Packet Built and added to Queue")
@@ -178,13 +189,15 @@ if __name__ == "__main__":
 	#Arguments?
     parser = argparse.ArgumentParser(description='Balloon Sensor Reader for Drifters')
     parser.add_argument("COMMPORT",type=str)
-    parser.add_argument("BALLONN",type=int)
+    parser.add_argument("BALLOON",type=int)
 	
     args = parser.parse_args()
 	
     COMMPORT = args.COMMPORT
+    if COMMPORT == "None":
+        COMMPORT = None
     
-    numid = args.BALLONN
+    numid = args.BALLOON
     NM_PORT = 16000 #hardcoded for now
     SensorRate = 1 #1 second 
 	
@@ -198,11 +211,11 @@ if __name__ == "__main__":
     wthread = WritingThread(s_out,NM_PORT,Logmode)
     wthread.start()
 
-    while threading.active_count() > 1:
+    while threading.active_count() > 3:
         try:
-		time.sleep(1)
+            time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
-		shutdown_event.set()
-			#log messages
+            shutdown_event.set()
+            #log messages
 			
     sys.exit()
