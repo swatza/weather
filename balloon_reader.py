@@ -190,7 +190,7 @@ class ReadFromSensor(threading.Thread):
          thisid = PyPacket.PacketID(PyPacket.PacketPlatform.AIRCRAFT,myIDnum)
          self.MYID = str(thisid.getBytes())
          
-         self.packet_log = PyPacketLogger.PyPacketLogger( ('Drifter_' + str(self.MYID)+ '_Sensing_Task_Log'))
+         self.packet_log = PyPacketLogger.PyPacketLogger( ('Drifter_Test_Sensing_Task_Log'))
          self.packet_log.initFile()
          self.logger.info("Logging Sensor Packets to: %s", self.packet_log.logname)
          
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     wthread = WritingThread(s_out,NM_PORT,Logmode)
     wthread.start()
 
-    while threading.active_count() > 3:
+    while threading.active_count() > 2:
         try:
             time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
