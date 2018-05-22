@@ -67,7 +67,7 @@ def ParseData(fn,counter,myID):
     #size of each data packet is ~218 bytes +/- 2 bytes
     #drifnum = 1 #fn.inWaiting()/218
     #balloon_msg.NumberOfBalloons = drifnum
-    # drifterStrs = []
+    drifterStrs = []
     loop = True
     idVals = []
     i = 0
@@ -82,9 +82,7 @@ def ParseData(fn,counter,myID):
             ##else:
             #print time.time()-timen
             ap = fn.readline()
-            print time.time()-timen
             drifterStrs.append(ap)
-            print time.time()-timen
             #print("This is the length of the data sample %i" % len(drifterStrs[0]))
             raw = drifterStrs[i].split()
 
@@ -250,7 +248,7 @@ if __name__ == "__main__":
     wthread = WritingThread(s_out,NM_PORT,Logmode)
     wthread.start()
 
-    while threading.active_count() > 2:
+    while threading.active_count() > 3:
         try:
             time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
