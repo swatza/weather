@@ -14,6 +14,7 @@ import serial
 sys.path.insert(0,'../PyUAS')
 sys.path.insert(0,'../PyUAS/protobuf')
 import PyPacket
+import PyPacketLogger
 import PyPackets_pb2
 import assorted_lib
 #import PyPacketLogger doesn't exist until we push the code from desktop
@@ -22,8 +23,9 @@ shutdown_event = threading.Event()
 msg_queue = Queue.Queue()
 
 def write_buffer(drifter,remote_data,rem_id,rssi):
+
     if remote_data is not None:
-        drifter.packetNum = 1
+        drifter.packetNum = int(remote_data[1])
         drifter.ID = str(rem_id)
         drifter.rssi = float(rssi)
         drifter.time = float(remote_data[9])
@@ -63,47 +65,77 @@ def ParseData(fn,counter,myID):
     
     #drifnum = nballoon
     #size of each data packet is ~218 bytes +/- 2 bytes
-    drifnum = 1 #fn.inWaiting()/218
-    balloon_msg.NumberOfBalloons = drifnum
-    drifterStrs = []
+    #drifnum = 1 #fn.inWaiting()/218
+    #balloon_msg.NumberOfBalloons = drifnum
+    # drifterStrs = []
+    loop = True
+    idVals = []
+    i = 0
+    timen = time.time()
+    timeout = timen + 1.1  # timeout just over 1 second
     if fn is not None:
-        for i in range(drifnum):
-            drifterStrs.append(fn.readline())
-            drifter = balloon_msg.balloon.add()
+        while loop:
+            ##if time.time()>timeout:
+            ##    print "timeout reached"
+            ##    loop = False
+
+            ##else:
+            #print time.time()-timen
+            ap = fn.readline()
+            print time.time()-timen
+            drifterStrs.append(ap)
+            print time.time()-timen
             #print("This is the length of the data sample %i" % len(drifterStrs[0]))
             raw = drifterStrs[i].split()
+
             #print("This is the size of the split string %i" % len(raw))
-            if len(raw) == 0:
+            if len(raw) < 8:
                 return None
 
-            ms_since_boot = raw[1]
             rem_id = raw[2]
-            rssi = raw[3]
-            rnge = raw[4]
-            azimuth = raw[5]
-            raw_data = raw[6]
+            if rem_id in idVals:
+                "Repeat reached"
+                loop = False
 
-            local_data = raw[7].split(',')
-            loc_vel = local_data[4]
-            loc_course = local_data[5]
-            loc_date = local_data[6]
-            loc_time = local_data[7]
+    #        if time.time() > timeout:
+    #            print "Reached timeout"
+    #            loop = False
 
-            remote_data = raw[8].split(',')
 
-            balloon_msg.receiverLLA_Pos.x = float(local_data[1])
-            balloon_msg.receiverLLA_Pos.y = float(local_data[2])
-            balloon_msg.receiverLLA_Pos.z = float(local_data[3])
+            else:
+                drifter = balloon_msg.balloon.add()
+                #print(drifterStrs[i])
+                ms_since_boot = raw[1]
+                rssi = raw[3]
+                raw_data = raw[6]
 
-            write_buffer(drifter,remote_data,rem_id,rssi)
+                local_data = raw[7].split(',')
+                loc_vel = local_data[4]
+                loc_course = local_data[5]
+                loc_date = local_data[6]
+                loc_time = local_data[7]
+
+                idVals.append(rem_id)
+                remote_data = raw[8].split(',')
+
+                balloon_msg.receiverLLA_Pos.x = float(local_data[1])
+                balloon_msg.receiverLLA_Pos.y = float(local_data[2])
+                balloon_msg.receiverLLA_Pos.z = float(local_data[3])
+                # balloon_msg.range = raw[4]
+                # balloon_msg.azimuth = raw[5]
+
+                write_buffer(drifter,remote_data,rem_id,rssi)
+                i+=1
+        balloon_msg.NumberOfBalloons = len(idVals)
     else:
-        for i in range(drifnum):
+        for k in range(2):
             drifter = balloon_msg.balloon.add()
-            write_buffer(drifter,None,0,0)
+            write_buffer(drifter, None, 0, 0)
             balloon_msg.receiverLLA_Pos.x = 0.0
             balloon_msg.receiverLLA_Pos.y = 1.0
             balloon_msg.receiverLLA_Pos.z = 2.0
-    
+        balloon_msg.NumberOfBalloons = 2
+
     return balloon_msg.SerializeToString()
         
 class WritingThread(threading.Thread):
@@ -146,7 +178,7 @@ class ReadFromSensor(threading.Thread):
          myhandler = logging.StreamHandler()
          self.logger.addHandler(myhandler)
          self.logger.info("Sensor Thread has started")
-     
+         
          #self.serialPortname = serialPort
          if serialPort is None:
              self.fn = None
@@ -157,6 +189,10 @@ class ReadFromSensor(threading.Thread):
          
          thisid = PyPacket.PacketID(PyPacket.PacketPlatform.AIRCRAFT,myIDnum)
          self.MYID = str(thisid.getBytes())
+         
+         self.packet_log = PyPacketLogger.PyPacketLogger( ('Drifter_' + str(self.MYID)+ '_Sensing_Task_Log'))
+         self.packet_log.initFile()
+         self.logger.info("Logging Sensor Packets to: %s", self.packet_log.logname)
          
          self.PyPkt = PyPacket.PyPacket()
          self.PyPkt.setDataType(PyPacket.PacketDataType.PKT_BALLOON_SENSOR_SET)
@@ -170,7 +206,10 @@ class ReadFromSensor(threading.Thread):
              counter += 1
              datastr = ParseData(self.fn,counter,self.MYID)
              if datastr is not None:
+                 print(len(datastr))
+                 #self.PyPkt.displayPacket()
                  self.PyPkt.setData(datastr)
+                 self.packet_log.writePacketToLog(self.PyPkt)
                  msg_queue.put(self.PyPkt.getPacket())
                  self.logger.info("Packet Built and added to Queue")
              else:
