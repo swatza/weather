@@ -38,7 +38,8 @@ def write_buffer(drifter,remote_data,rem_id,rssi):
         drifter.battery.voltage = float(remote_data[10])
         drifter.Vel.x = float(remote_data[12])
         drifter.Vel.y = float(remote_data[11])
-        drifter.Vel.z = 0
+        drifter.Vel.z = float(remote_data[13][0:-1])
+        
 
     else:
         drifter.packetNum = 1
@@ -124,6 +125,7 @@ def ParseData(fn,counter,myID):
 
                 write_buffer(drifter,remote_data,rem_id,rssi)
                 i+=1
+        print idVals
         balloon_msg.NumberOfBalloons = len(idVals)
     else:
         for k in range(2):
@@ -187,8 +189,8 @@ class ReadFromSensor(threading.Thread):
          
          thisid = PyPacket.PacketID(PyPacket.PacketPlatform.AIRCRAFT,myIDnum)
          self.MYID = str(thisid.getBytes())
-         
-         self.packet_log = PyPacketLogger.PyPacketLogger( ('Drifter_Test_Sensing_Task_Log'))
+         fn = time.strftime("%Y%m%d-%H%M%S")
+         self.packet_log = PyPacketLogger.PyPacketLogger(fn)
          self.packet_log.initFile()
          self.logger.info("Logging Sensor Packets to: %s", self.packet_log.logname)
          
